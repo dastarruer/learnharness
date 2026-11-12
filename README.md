@@ -65,6 +65,12 @@ We provide a `flake.nix` to give Nix users access to the latest development buil
 inputs.learnharness.url = "github:amosblomqvist/learnharness";
 ```
 
+Optionally, build it against your own nixpkgs instead of the one pinned in this flake (this skips the binary cache, which only holds builds against the pinned nixpkgs):
+
+```nix
+inputs.learnharness.inputs.nixpkgs.follows = "nixpkgs";
+```
+
 Then, add the following to `environment.systemPackages`, and rebuild:
 
 ```nix

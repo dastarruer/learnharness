@@ -1,6 +1,7 @@
 {
   lib,
   buildNpmPackage,
+  importNpmLock,
   electron,
   makeWrapper,
   copyDesktopItems,
@@ -9,25 +10,27 @@
 
 buildNpmPackage rec {
   pname = "learnharness";
-  version = "0.0.0-git";
+  inherit ((lib.importJSON ../package.json)) version;
 
   src = ../.;
 
-  npmDepsHash = "sha256-a25cTyAXbk0AA3nNdOoMQ/Q5dVangmTrxO4uo1ekvhc=";
+  # Fetch each dependency from package-lock.json, so there is no
+  # npmDepsHash to bump whenever the lockfile changes.
+  npmDeps = importNpmLock { npmRoot = src; };
+  npmConfigHook = importNpmLock.npmConfigHook;
 
   nativeBuildInputs = [
     makeWrapper
     copyDesktopItems
   ];
 
-  # Runs `npm run build` (= next build), which the app needs.
-  # Remove dontNpmBuild entirely.
-
   env = {
     ELECTRON_SKIP_BINARY_DOWNLOAD = 1;
     NEXT_TELEMETRY_DISABLED = 1;
   };
 
+  # `npm run build` (next build) has produced .next/standalone; finish the
+  # server payload the way the electron-builder release does.
   postBuild = ''
     node scripts/build-server.mjs
   '';
@@ -47,26 +50,29 @@ buildNpmPackage rec {
   installPhase = ''
     runHook preInstall
 
-    mkdir -p $out/share/${pname}
-    cp -r . $out/share/${pname}
+    # The Electron shell only needs its own code: electron/main.cjs requires
+    # nothing from node_modules (electron-updater is only loaded in
+    # packaged builds), and the server carries its own traced node_modules.
+    app=$out/share/${pname}
+    mkdir -p $app
+    cp -r package.json electron $app/
 
     # Recreate electron-builder's Resources/ layout
-    res=$out/share/${pname}/resources
+    res=$app/resources
     mkdir -p $res/server
     cp -r .next/standalone $res/server/standalone
     cp electron/server-title-guard.cjs $res/server-title-guard.cjs
 
     # Stock electron's resourcesPath is read-only and has no server/; point at ours
-    substituteInPlace $out/share/${pname}/electron/main.cjs \
+    substituteInPlace $app/electron/main.cjs \
       --replace-fail 'process.resourcesPath' "\"$res\""
 
-    makeWrapper ${electron}/bin/electron $out/bin/${pname} \
-      --add-flags $out/share/${pname} \
+    makeWrapper ${lib.getExe electron} $out/bin/${pname} \
+      --add-flags $app \
       --set NODE_ENV production
 
-      # TODO: build .desktop file
     install -Dm444 build/icon.png \
-        $out/share/icons/hicolor/512x512/apps/learnharness.png
+      $out/share/icons/hicolor/512x512/apps/learnharness.png
 
     runHook postInstall
   '';
