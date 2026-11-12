@@ -1,5 +1,5 @@
 {
-  description = "A Nix-flake-based Node.js development environment";
+  description = "LearnHarness, an agent harness for learning difficult things";
 
   inputs.nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.1"; # unstable Nixpkgs
 
@@ -45,7 +45,8 @@
       packages = forEachSupportedSystem (
         { pkgs, ... }:
         {
-          default = pkgs.callPackage ./nix/package.nix { };
+          # Match the Electron major in package.json (devDependencies.electron).
+          default = pkgs.callPackage ./nix/package.nix { electron = pkgs.electron_44; };
         }
       );
 
